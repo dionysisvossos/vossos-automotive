@@ -1,0 +1,532 @@
+// Vossos Automotive — Case management schema
+// Διαχείριση υποθέσεων οχημάτων: ταξινομήσεις, μεταβιβάσεις, φορτηγά κ.λπ.
+//
+// Δομή:
+//   1. Συναλλασσόμενοι & ρόλοι  (Contact, ReferrerProfile)
+//   2. Οχήματα                  (Vehicle)
+//   3. Χρήστες & Auth.js         (User, Account, Session, VerificationToken)
+//   4. Παραμετροποίηση workflow  (CaseType, StageTemplate, DocRequirement)
+//   5. Υποθέσεις & εκτέλεση       (Case, CaseStage, Document)
+//   6. Audit                     (AuditLog)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum ContactType {
+  PERSON // φυσικό πρόσωπο
+  COMPANY // νομικό πρόσωπο
+}
+
+enum CommissionType {
+  PERCENTAGE // ποσοστό επί της αμοιβής/αξίας
+  FIXED // σταθερό ποσό ανά υπόθεση
+}
+
+enum VehicleCategory {
+  PASSENGER // επιβατικό
+  TRUCK // φορτηγό
+  MOTORCYCLE // δίκυκλο
+  BUS // λεωφορείο
+  TRAILER // ρυμουλκούμενο
+  OTHER
+}
+
+enum VehicleCondition {
+  NEW // καινούργιο
+  USED // μεταχειρισμένο
+}
+
+enum UserRole {
+  ADMIN // διαχειριστής — ρυθμίζει τύπους/στάδια/δικαιολογητικά
+  EMPLOYEE // υπάλληλος — χειρίζεται υποθέσεις
+  VIEWER // μόνο ανάγνωση (π.χ. λογιστήριο)
+}
+
+enum CaseState {
+  OPEN // σε εξέλιξη
+  COMPLETED // ολοκληρωμένη
+  CANCELLED // ακυρωμένη
+}
+
+enum CaseStageState {
+  PENDING // δεν ξεκίνησε
+  IN_PROGRESS // σε εξέλιξη
+  DONE // ολοκληρώθηκε
+  SKIPPED // παρακάμφθηκε
+}
+
+enum CasePartyRole {
+  SELLER // πωλητής
+  BUYER // αγοραστής
+  OWNER // κάτοχος / πελάτης (υποθέσεις ενός μέρους)
+  REFERRER // προμηθευτής — ποιος έφερε την υπόθεση
+}
+
+// Κύρια κατηγορία για την ομαδοποίηση σε κουμπιά στη φόρμα καταχώρησης.
+enum CaseCategory {
+  REGISTRATION // Ταξινόμηση (καινούργια + ανάριθμη)
+  TRANSFER // Μεταβίβαση μεταχειρισμένου
+  TRUCK // ΦΙΧ (ταξινόμηση/μεταβίβαση/ακινησία/συμβόλαιο)
+  OTHER // Λοιπές εργασίες
+}
+
+// Είδος εξόδου προς τρίτους (pass-through, χρεώνεται στον πελάτη).
+enum ExpenseType {
+  TAX // τέλος (ταξινόμησης/μεταβίβασης)
+  STAMP // παράβολο
+  KTEO
+  CUSTOMS // τελωνείο
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH // μετρητά
+  CARD // κάρτα
+  TRANSFER // κατάθεση / έμβασμα
+  OTHER
+}
+
+// Προτίμηση αριθμού πινακίδας (ταξινομήσεις).
+enum PlatePreference {
+  EVEN // ζυγό
+  ODD // μονό
+  SPECIAL // ειδικό (συγκεκριμένο νούμερο κατόπιν αιτήματος)
+}
+
+// ─────────────────────────────────────────────────────────────
+// 1. Συναλλασσόμενοι & ρόλοι
+// ─────────────────────────────────────────────────────────────
+
+// Ενοποιημένη οντότητα για οποιονδήποτε εμπλέκεται σε υπόθεση:
+// πωλητή, αγοραστή ή προμηθευτή. Ο ρόλος αποδίδεται ανά υπόθεση
+// μέσω των FK του Case — έτσι η ίδια αντιπροσωπεία δεν διπλογράφεται.
+model Contact {
+  id        String      @id @default(uuid())
+  type      ContactType
+  // Φυσικό πρόσωπο: επώνυμο + όνομα. Εταιρία: η επωνυμία μπαίνει στο lastName.
+  lastName  String // επώνυμο / επωνυμία
+  firstName String? // όνομα (μόνο φυσικά πρόσωπα)
+  afm       String? // ΑΦΜ
+  doy       String? // ΔΟΥ
+  idNumber  String? // αριθμός ταυτότητας
+  phone     String?
+  email     String?
+  address   String?
+  notes     String?
+  // Γρήγορο φιλτράρισμα· τα εμπορικά στοιχεία ζουν στο ReferrerProfile
+  isReferrer Boolean    @default(false)
+
+  referrerProfile ReferrerProfile?
+
+  // Συμμετοχές σε υποθέσεις με ρόλο (πωλητής/αγοραστής/κάτοχος/προμηθευτής)
+  caseParties CaseParty[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([afm])
+  @@index([lastName])
+  @@index([isReferrer])
+}
+
+// Καρτέλα προμηθευτή — 1:1 με Contact, μόνο για όσους φέρνουν υποθέσεις.
+model ReferrerProfile {
+  id             String         @id @default(uuid())
+  contactId      String         @unique
+  contact        Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  commissionType CommissionType @default(FIXED)
+  commissionValue Decimal       @default(0) @db.Decimal(12, 2)
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────
+// 2. Οχήματα  (1 υπόθεση = 1 όχημα)
+// ─────────────────────────────────────────────────────────────
+
+model Vehicle {
+  id                    String           @id @default(uuid())
+  category              VehicleCategory
+  condition             VehicleCondition
+  vin                   String? // αριθμός πλαισίου — φυσικό κλειδί αναζήτησης ιστορικού
+  plate                 String? // αριθμός κυκλοφορίας (κενός σε ταξινόμηση καινούργιου)
+  make                  String?
+  firstRegistration     DateTime?
+  // Ρύποι CO₂ (g/km) — τέλη κυκλοφορίας για οχήματα μετά 1/11/2010
+  emissions             Int?
+  // Κυβικά (cc) — τέλη κυκλοφορίας για οχήματα έως 31/10/2010
+  cc                    Int?
+  // Παρακράτηση κυριότητας (π.χ. όχημα με χρηματοδότηση)
+  hasOwnershipRetention Boolean          @default(false)
+
+  case Case? // αντίστροφη πλευρά της 1:1 σχέσης
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vin])
+  @@index([plate])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3. Χρήστες & Auth.js
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id               String    @id @default(uuid())
+  fullName         String
+  email            String    @unique
+  emailVerified    DateTime?
+  image            String?
+  role             UserRole  @default(EMPLOYEE)
+  active           Boolean   @default(true)
+  // Credentials login + 2FA για την απομακρυσμένη πρόσβαση
+  passwordHash     String?
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret  String?
+
+  accounts Account[]
+  sessions Session[]
+
+  assignedCases     Case[]        @relation("CaseAssignee")
+  completedStages   CaseStage[]   @relation("StageCompletedBy")
+  uploadedDocuments Document[]
+  auditLogs         AuditLog[]
+  recordedExpenses  CaseExpense[] @relation("ExpenseCreatedBy")
+  recordedPayments  CasePayment[] @relation("PaymentCreatedBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Τυπικά μοντέλα Auth.js — για OAuth/credentials providers & sessions
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 4. Παραμετροποίηση workflow (ρυθμίζεται από τον ADMIN μέσω app)
+// ─────────────────────────────────────────────────────────────
+
+// Υπηρεσία περιφέρειας όπου διεκπεραιώνεται η υπόθεση (Δ/νση Μεταφορών κ.λπ.).
+// Reference data για auditing & αναφορές — το διαχειρίζεται ο admin.
+model RegionalService {
+  id     String  @id @default(uuid())
+  name   String  @unique // π.χ. "Δ/νση Μεταφορών Π.Ε. Θεσσαλονίκης"
+  region String? // Περιφέρεια / Περιφερειακή Ενότητα
+  active Boolean @default(true)
+
+  cases Case[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Τύπος υπόθεσης: ταξινόμηση / μεταβίβαση / φορτηγό / …
+model CaseType {
+  id              String  @id @default(uuid())
+  name            String  @unique
+  description     String?
+  active          Boolean @default(true)
+  // Κύρια κατηγορία (κουμπί) στη φόρμα καταχώρησης
+  category        CaseCategory @default(OTHER)
+  // Αν ο τύπος αφορά όχημα (π.χ. άδειες οδήγησης = false)
+  requiresVehicle Boolean @default(true)
+  // Ελεύθερη συμπλήρωση χωρίς προκαθορισμένα στάδια (τύπος "Άλλο")
+  isFreeform      Boolean @default(false)
+  // Ποια πάγια τέλη προτείνονται (κουμπί «Προτεινόμενα έξοδα»)
+  hasLicenseFee     Boolean @default(false) // τέλος άδειας (75€ / 9€ μοτο)
+  hasCirculationTax Boolean @default(false) // τέλη κυκλοφορίας (ρύποι ή cc)
+  hasTransferFee    Boolean @default(false) // τέλος μεταβίβασης (βάσει cc)
+  // Εκδίδονται πινακίδες (εμφανίζει επιλογή ζυγό/μονό/ειδικό)
+  issuesPlates      Boolean @default(false)
+  // Υποστηρίζει παραλλαγή εισαγωγής (toggle «Εισαγωγή από εξωτερικό»)
+  supportsImport    Boolean @default(false)
+
+  stageTemplates  StageTemplate[]
+  docRequirements DocRequirement[]
+  cases           Case[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Πρότυπο σταδίου — τα διατεταγμένα βήματα ενός τύπου (position = σειρά).
+model StageTemplate {
+  id         String   @id @default(uuid())
+  caseTypeId String
+  caseType   CaseType @relation(fields: [caseTypeId], references: [id], onDelete: Cascade)
+  name       String
+  position   Int // σειρά εκτέλεσης
+  isTerminal Boolean  @default(false) // τελικό στάδιο του τύπου
+
+  caseStages CaseStage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([caseTypeId, position])
+  @@index([caseTypeId])
+}
+
+// Απαιτούμενο δικαιολογητικό ανά τύπο υπόθεσης.
+model DocRequirement {
+  id         String   @id @default(uuid())
+  caseTypeId String
+  caseType   CaseType @relation(fields: [caseTypeId], references: [id], onDelete: Cascade)
+  name       String
+  mandatory  Boolean  @default(true)
+  // Εμφανίζεται μόνο σε ταξινομήσεις εισαγωγής (Case.isImport = true)
+  importOnly Boolean  @default(false)
+
+  documents Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([caseTypeId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 5. Υποθέσεις & εκτέλεση
+// ─────────────────────────────────────────────────────────────
+
+model Case {
+  id         String    @id @default(uuid())
+  code       String    @unique // ανθρώπινος αριθμός υπόθεσης (π.χ. 2026-00042)
+  caseTypeId String
+  caseType   CaseType  @relation(fields: [caseTypeId], references: [id])
+  state      CaseState @default(OPEN)
+  // Επείγον / αυθημερόν — προτεραιότητα διεκπεραίωσης
+  urgent     Boolean   @default(false)
+
+  // Όχημα (1:1, προαιρετικό — π.χ. άδειες οδήγησης δεν αφορούν όχημα)
+  vehicleId String?  @unique
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  // Εμπλεκόμενοι ανά ρόλο (μέσω CaseParty) — υποστηρίζει και συνιδιοκτησία.
+  // Αν προμηθευτής == πωλητής/αγοραστής, μπαίνουν δύο εγγραφές για το ίδιο Contact.
+  parties CaseParty[]
+
+  // Υπεύθυνος υπάλληλος
+  assignedUserId String?
+  assignedUser   User?   @relation("CaseAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  // Υπηρεσία περιφέρειας διεκπεραίωσης (auditing). Restrict: δεν διαγράφεται
+  // υπηρεσία που έχει υποθέσεις, ώστε να μη χαθεί το ίχνος.
+  regionalServiceId String?
+  regionalService   RegionalService? @relation(fields: [regionalServiceId], references: [id], onDelete: Restrict)
+
+  // Τρέχον στάδιο (δείκτης στο instance) — για γρήγορα queries
+  currentStageId String?    @unique
+  currentStage   CaseStage? @relation("CurrentStage", fields: [currentStageId], references: [id])
+
+  // Αμοιβή διεκπεραίωσης — τιμολόγηση γίνεται σε εξωτερικό πάροχο.
+  // Έξοδα (pass-through) & εισπράξεις παρακολουθούνται σε γραμμές.
+  fee Decimal? @db.Decimal(12, 2)
+
+  // Χρέωση επείγοντος (όταν urgent = true)
+  urgentFee Decimal? @db.Decimal(12, 2)
+
+  // Πινακίδες (ταξινομήσεις): προτίμηση + ειδικό αίτημα/χρέωση
+  platePreference PlatePreference?
+  plateRequest    String? // ζητούμενο ειδικό νούμερο
+  plateFee        Decimal? @db.Decimal(12, 2)
+
+  // Πλήρης φάκελος: όλα τα δικαιολογητικά παρελήφθησαν
+  documentsComplete Boolean @default(false)
+
+  // Ταξινόμηση εισαγωγής (μεταχειρισμένο ταξινομημένο στο εξωτερικό) —
+  // εμφανίζει τα επιπλέον δικαιολογητικά εισαγωγής.
+  isImport Boolean @default(false)
+
+  // Ελεύθερες σημειώσεις — κυρίως για υποθέσεις τύπου "Άλλο"
+  notes String?
+
+  stages    CaseStage[]   @relation("CaseStages")
+  documents Document[]
+  expenses  CaseExpense[]
+  payments  CasePayment[]
+
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([caseTypeId])
+  @@index([state])
+  @@index([assignedUserId])
+  @@index([regionalServiceId])
+}
+
+// Εμπλεκόμενο μέρος σε υπόθεση, με ρόλο. Επιτρέπει πολλαπλούς στον ίδιο
+// ρόλο (συνιδιοκτησία) και το ίδιο Contact σε πολλούς ρόλους (π.χ.
+// προμηθευτής που είναι και πωλητής).
+model CaseParty {
+  id        String        @id @default(uuid())
+  caseId    String
+  case      Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  contactId String
+  contact   Contact       @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  role      CasePartyRole
+  createdAt DateTime      @default(now())
+
+  // Ίδιο πρόσωπο δεν μπαίνει δύο φορές στον ίδιο ρόλο της ίδιας υπόθεσης
+  @@unique([caseId, contactId, role])
+  @@index([caseId])
+  @@index([contactId])
+  @@index([role])
+}
+
+// Έξοδο προς τρίτους (τέλος/παράβολο/ΚΤΕΟ/τελωνείο) — pass-through, χρεώνεται
+// στον πελάτη πάνω από την αμοιβή.
+model CaseExpense {
+  id          String      @id @default(uuid())
+  caseId      String
+  case        Case        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  type        ExpenseType @default(OTHER)
+  description String?
+  amount      Decimal     @db.Decimal(12, 2)
+  incurredAt  DateTime    @default(now())
+
+  createdById String?
+  createdBy   User?    @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([caseId])
+}
+
+// Είσπραξη από τον πελάτη (προκαταβολή / εξόφληση / δόση).
+model CasePayment {
+  id         String        @id @default(uuid())
+  caseId     String
+  case       Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  amount     Decimal       @db.Decimal(12, 2)
+  method     PaymentMethod @default(CASH)
+  note       String?
+  receivedAt DateTime      @default(now())
+
+  createdById String?
+  createdBy   User?    @relation("PaymentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([caseId])
+}
+
+// Instance σταδίου μιας υπόθεσης — snapshot του προτύπου ώστε αλλαγές
+// του admin να ΜΗΝ αλλοιώνουν παλιές υποθέσεις.
+model CaseStage {
+  id              String         @id @default(uuid())
+  caseId          String
+  case            Case           @relation("CaseStages", fields: [caseId], references: [id], onDelete: Cascade)
+  stageTemplateId String?
+  stageTemplate   StageTemplate? @relation(fields: [stageTemplateId], references: [id], onDelete: SetNull)
+
+  // Αντιγραμμένα από το πρότυπο τη στιγμή δημιουργίας της υπόθεσης
+  name     String
+  position Int
+
+  state         CaseStageState @default(PENDING)
+  completedById String?
+  completedBy   User?          @relation("StageCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  completedAt   DateTime?
+  note          String?
+
+  // Αντίστροφη πλευρά του Case.currentStage
+  currentOfCase Case? @relation("CurrentStage")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([caseId, position])
+  @@index([caseId])
+  @@index([state])
+}
+
+// Συνημμένο έγγραφο — το binary ζει σε S3-compatible storage (storageKey),
+// στη βάση μένουν μόνο τα metadata.
+model Document {
+  id               String          @id @default(uuid())
+  caseId           String
+  case             Case            @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  docRequirementId String?
+  docRequirement   DocRequirement? @relation(fields: [docRequirementId], references: [id], onDelete: SetNull)
+
+  filename   String
+  storageKey String // κλειδί στο object storage
+  mimeType   String?
+  sizeBytes  Int?
+
+  uploadedById String?
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedAt   DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([caseId])
+  @@index([docRequirementId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 6. Audit — ποιος είδε/άλλαξε τι (απαίτηση GDPR)
+// ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  entity    String // π.χ. "Case", "Contact"
+  entityId  String?
+  action    String // π.χ. "CREATE", "UPDATE", "VIEW", "DELETE"
+  metadata  Json? // πρότερες/νέες τιμές, πλαίσιο
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
