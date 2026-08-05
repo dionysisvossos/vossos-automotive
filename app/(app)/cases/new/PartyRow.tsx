@@ -9,6 +9,7 @@ export type PartyValue = {
   contactType: string;
   lastName: string;
   firstName: string;
+  fatherName: string;
   afm: string;
   idNumber: string;
   phone: string;
@@ -89,6 +90,7 @@ export default function PartyRow({
       contactType: c.type,
       lastName: c.lastName,
       firstName: c.firstName ?? "",
+      fatherName: c.fatherName ?? "",
       afm: c.afm ?? "",
       idNumber: c.idNumber ?? "",
       phone: c.phone ?? "",
@@ -273,6 +275,13 @@ export default function PartyRow({
           <input
             value={value.firstName}
             onChange={(e) => onChange({ firstName: e.target.value })}
+          />
+        </label>
+        <label style={labelStyle}>
+          Όνομα πατέρα
+          <input
+            value={value.fatherName}
+            onChange={(e) => onChange({ fatherName: e.target.value })}
           />
         </label>
         <label style={labelStyle}>

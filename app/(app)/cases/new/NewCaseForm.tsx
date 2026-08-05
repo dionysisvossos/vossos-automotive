@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { createCase, type CreateCaseInput } from "../actions";
+import { aitisiTemplateFor } from "@/lib/aitisi-template";
 import PartyRow, { type PartyValue } from "./PartyRow";
 
 type CaseTypeOption = {
@@ -59,6 +61,7 @@ const emptyParty: PartyValue = {
   contactType: "PERSON",
   lastName: "",
   firstName: "",
+  fatherName: "",
   afm: "",
   idNumber: "",
   phone: "",
@@ -113,6 +116,7 @@ export default function NewCaseForm({
   const [subTypeId, setSubTypeId] = useState("");
 
   const [regionalServiceId, setRegionalServiceId] = useState("");
+  const [delivery, setDelivery] = useState("");
   const [urgent, setUrgent] = useState(false);
   const [urgentFee, setUrgentFee] = useState("");
   const [platePref, setPlatePref] = useState(""); // "" | EVEN | ODD | SPECIAL
@@ -133,6 +137,7 @@ export default function NewCaseForm({
   const [referrer, setReferrer] = useState<PartyValue>({ ...emptyReferrer });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   // Όταν αλλάζει κατηγορία, μηδένισε το dropdown (ΦΙΧ/Λοιπές).
   useEffect(() => {
@@ -156,13 +161,26 @@ export default function NewCaseForm({
   const selectedType = caseTypes.find((t) => t.id === caseTypeId);
   const requiresVehicle = selectedType?.requiresVehicle ?? false;
 
+  // Έχει αυτός ο τύπος διαθέσιμη αίτηση; (για το κουμπί «Δημιουργία & Αίτηση»)
+  const effectiveImport = (selectedType?.supportsImport ?? false) && isImport;
+  const hasAitisi = selectedType
+    ? aitisiTemplateFor(
+        {
+          category: selectedType.category,
+          issuesPlates: selectedType.issuesPlates,
+          name: selectedType.name,
+        },
+        effectiveImport,
+      ) !== null
+    : false;
+
   function updateParty(i: number, patch: Partial<PartyValue>) {
     setParties((prev) =>
       prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)),
     );
   }
 
-  function submit() {
+  function submit(withAitisi = false) {
     setError(null);
     if (!caseTypeId) {
       setError("Επίλεξε τύπο υπόθεσης.");
@@ -194,6 +212,7 @@ export default function NewCaseForm({
           ? parseAmount(plateFee)
           : undefined,
       regionalServiceId: regionalServiceId || undefined,
+      delivery: delivery.trim() || undefined,
       notes: notes.trim() || undefined,
       vehicle: requiresVehicle
         ? {
@@ -215,6 +234,7 @@ export default function NewCaseForm({
         contactType: p.contactType as Party["contactType"],
         lastName: p.lastName.trim(),
         firstName: p.firstName.trim() || undefined,
+        fatherName: p.fatherName.trim() || undefined,
         afm: p.afm.trim() || undefined,
         idNumber: p.idNumber.trim() || undefined,
         phone: p.phone.trim() || undefined,
@@ -241,10 +261,17 @@ export default function NewCaseForm({
       return;
     }
 
+    // Η νέα καρτέλα για την αίτηση πρέπει να ανοίξει ΣΥΓΧΡΟΝΑ μέσα στο click
+    // (αλλιώς την μπλοκάρει ο popup blocker)· τη γεμίζουμε μόλις έχουμε το id.
+    const aitisiWin = withAitisi ? window.open("", "_blank") : null;
+
     startTransition(async () => {
       try {
-        await createCase(input);
+        const id = await createCase(input);
+        if (aitisiWin) aitisiWin.location.href = `/api/cases/${id}/aitisi`;
+        router.push(`/cases/${id}#financials`);
       } catch (e) {
+        aitisiWin?.close();
         setError(e instanceof Error ? e.message : "Κάτι πήγε στραβά.");
       }
     });
@@ -357,6 +384,15 @@ export default function NewCaseForm({
               </option>
             ))}
           </select>
+        </label>
+
+        <label style={{ ...labelStyle, maxWidth: 320 }}>
+          Παράδοση (πού παραδίδεται)
+          <input
+            value={delivery}
+            onChange={(e) => setDelivery(e.target.value)}
+            placeholder="π.χ. αντιπροσωπεία, πελάτης…"
+          />
         </label>
 
         <label
@@ -594,15 +630,26 @@ export default function NewCaseForm({
         </p>
       </section>
 
-      <div style={{ display: "flex", gap: 10 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button
           type="button"
           className="btn"
-          onClick={submit}
+          onClick={() => submit(false)}
           disabled={pending}
         >
           {pending ? "Δημιουργία…" : "Δημιουργία υπόθεσης"}
         </button>
+        {hasAitisi && (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => submit(true)}
+            disabled={pending}
+            title="Δημιουργία υπόθεσης και άνοιγμα της αίτησης σε νέα καρτέλα"
+          >
+            📄 Δημιουργία & Αίτηση
+          </button>
+        )}
       </div>
     </div>
   );

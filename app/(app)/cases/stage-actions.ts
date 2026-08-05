@@ -103,6 +103,17 @@ export async function unmarkFileComplete(fd: FormData) {
   revalidatePath(`/cases/${caseId}`);
 }
 
+// Πού παραδίδεται η υπόθεση.
+export async function setDelivery(fd: FormData) {
+  await requireOperator();
+  const caseId = str(fd, "caseId");
+  await prisma.case.update({
+    where: { id: caseId },
+    data: { delivery: str(fd, "delivery") || null },
+  });
+  revalidatePath(`/cases/${caseId}`);
+}
+
 // Toggle «Εισαγωγή από εξωτερικό» — εμφανίζει τα επιπλέον δικαιολογητικά.
 export async function setImport(fd: FormData) {
   await requireOperator();

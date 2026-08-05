@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { CaseStageState, CaseState } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { aitisiTemplateFor } from "@/lib/aitisi";
 import {
   licenseFee,
   transferFee,
@@ -25,6 +26,7 @@ import {
   markFileComplete,
   unmarkFileComplete,
   setImport,
+  setDelivery,
 } from "../stage-actions";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -47,6 +49,10 @@ const CASE_STATE_COLORS: Record<CaseState, string> = {
 };
 
 const EXPENSE_TYPE_LABELS: Record<string, string> = {
+  LICENSE: "Τέλος άδειας",
+  BANK: "Προμήθεια τράπεζας",
+  CIRCULATION: "Τέλη κυκλοφορίας",
+  TRANSFER: "Τέλος μεταβίβασης",
   TAX: "Τέλος",
   STAMP: "Παράβολο",
   KTEO: "ΚΤΕΟ",
@@ -205,6 +211,17 @@ export default async function CaseDetailPage({
               {CASE_STATE_LABELS[c.state]}
             </span>
           </h1>
+          {aitisiTemplateFor(c.caseType, c.isImport) && (
+            <a
+              href={`/api/cases/${c.id}/aitisi`}
+              target="_blank"
+              rel="noopener"
+              className="btn btn-ghost"
+              style={{ whiteSpace: "nowrap", fontSize: 14 }}
+            >
+              📄 Αίτηση (PDF)
+            </a>
+          )}
         </div>
       </div>
 
@@ -264,6 +281,21 @@ export default async function CaseDetailPage({
         />
         <Field label="Υπεύθυνος" value={c.assignedUser?.fullName} />
         <Field label="Υπηρεσία περιφέρειας" value={c.regionalService?.name} />
+        <form action={setDelivery} style={{ display: "grid", gap: 4 }}>
+          <input type="hidden" name="caseId" value={c.id} />
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Παράδοση</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              name="delivery"
+              defaultValue={c.delivery ?? ""}
+              placeholder="—"
+              style={{ flex: 1, minWidth: 0 }}
+            />
+            <button className="btn btn-ghost" type="submit" title="Αποθήκευση">
+              ✓
+            </button>
+          </div>
+        </form>
         <Field
           label="Υπόλοιπο"
           value={
@@ -551,11 +583,15 @@ export default async function CaseDetailPage({
             <form action={addExpense} style={{ display: "grid", gap: 6 }}>
               <input type="hidden" name="caseId" value={c.id} />
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <select name="type" defaultValue="TAX">
-                  <option value="TAX">Τέλος</option>
+                <select name="type" defaultValue="LICENSE">
+                  <option value="LICENSE">Τέλος άδειας</option>
+                  <option value="BANK">Προμήθεια τράπεζας</option>
+                  <option value="CIRCULATION">Τέλη κυκλοφορίας</option>
+                  <option value="TRANSFER">Τέλος μεταβίβασης</option>
                   <option value="STAMP">Παράβολο</option>
                   <option value="KTEO">ΚΤΕΟ</option>
                   <option value="CUSTOMS">Τελωνείο</option>
+                  <option value="TAX">Άλλο τέλος</option>
                   <option value="OTHER">Άλλο</option>
                 </select>
                 <input

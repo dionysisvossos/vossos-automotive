@@ -1,7 +1,6 @@
 "use server";
 
 import { z } from "zod";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
   Prisma,
@@ -21,6 +20,7 @@ const partySchema = z.object({
   contactType: z.nativeEnum(ContactType),
   lastName: z.string().trim().min(1, "Το επώνυμο είναι υποχρεωτικό"),
   firstName: z.string().trim().optional(),
+  fatherName: z.string().trim().optional(), // όνομα πατέρα (αίτηση μεταβίβασης)
   afm: z.string().trim().optional(),
   idNumber: z.string().trim().optional(),
   phone: z.string().trim().optional(),
@@ -46,6 +46,7 @@ const createCaseSchema = z.object({
   caseTypeId: z.string().min(1),
   regionalServiceId: z.string().optional(),
   notes: z.string().trim().optional(),
+  delivery: z.string().trim().optional(),
   urgent: z.boolean().default(false),
   isImport: z.boolean().default(false),
   urgentFee: z.number().nonnegative().optional(),
@@ -67,7 +68,7 @@ async function nextCaseCode(): Promise<string> {
   return `${year}-${String(count + 1).padStart(5, "0")}`;
 }
 
-export async function createCase(input: CreateCaseInput): Promise<void> {
+export async function createCase(input: CreateCaseInput): Promise<string> {
   const session = await auth();
   if (!session?.user) throw new Error("Απαιτείται σύνδεση");
 
@@ -139,6 +140,7 @@ export async function createCase(input: CreateCaseInput): Promise<void> {
             type: p.contactType,
             lastName: p.lastName,
             firstName: p.firstName || null,
+            fatherName: p.fatherName || null,
             afm: p.afm || null,
             idNumber: p.idNumber || null,
             phone: p.phone || null,
@@ -178,6 +180,7 @@ export async function createCase(input: CreateCaseInput): Promise<void> {
         regionalServiceId: data.regionalServiceId || null,
         // Αυτόματη ανάθεση στον χειριστή που καταχωρεί (συνδεδεμένος χρήστης).
         assignedUserId: session.user.id,
+        delivery: data.delivery || null,
         notes: data.notes || null,
         parties: {
           create: partyLinks.map((l) => ({
@@ -209,8 +212,9 @@ export async function createCase(input: CreateCaseInput): Promise<void> {
   });
 
   revalidatePath("/cases");
-  // Οδηγεί κατευθείαν στα Οικονομικά για άμεση συμπλήρωση.
-  redirect(`/cases/${created.id}#financials`);
+  // Η πλοήγηση γίνεται από τον client (ώστε να μπορεί προαιρετικά να ανοίξει
+  // και την αίτηση σε νέα καρτέλα στο ίδιο βήμα).
+  return created.id;
 }
 
 export type ContactMatch = {
@@ -218,6 +222,7 @@ export type ContactMatch = {
   type: ContactType;
   lastName: string;
   firstName: string | null;
+  fatherName: string | null;
   afm: string | null;
   idNumber: string | null;
   phone: string | null;
@@ -249,7 +254,7 @@ export async function searchContacts(query: string): Promise<ContactMatch[]> {
   // f_unaccent(): immutable wrapper → accent-insensitive ταίριασμα που
   // αξιοποιεί το GIN trigram index.
   return prisma.$queryRaw<ContactMatch[]>`
-    SELECT id, type, "lastName", "firstName", afm, "idNumber", phone, email, address
+    SELECT id, type, "lastName", "firstName", "fatherName", afm, "idNumber", phone, email, address
     FROM "Contact"
     WHERE (${nameMatch})
        OR afm ILIKE ${like}

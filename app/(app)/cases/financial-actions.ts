@@ -123,11 +123,11 @@ export async function addSuggestedExpenses(fd: FormData) {
     createdById: string;
   }[] = [];
 
-  const add = (description: string, amount: number) => {
+  const add = (type: ExpenseType, description: string, amount: number) => {
     if (amount > 0 && !existing.has(description)) {
       toCreate.push({
         caseId,
-        type: ExpenseType.TAX,
+        type,
         description,
         amount,
         createdById: session.user.id,
@@ -137,15 +137,16 @@ export async function addSuggestedExpenses(fd: FormData) {
 
   const isMotorcycle = c.vehicle?.category === "MOTORCYCLE";
 
-  // Τέλος άδειας (75€ / 9€ μοτο) + προμήθεια τράπεζας — ξεχωριστές γραμμές.
+  // Τέλος άδειας (75€ / 9€ μοτο) + προμήθεια τράπεζας — ξεχωριστές γραμμές,
+  // ώστε το «καθαρό» παράβολο να ξεχωρίζει στις αναφορές.
   if (c.caseType.hasLicenseFee) {
-    add("Τέλος άδειας", licenseFee(isMotorcycle));
-    add("Προμήθεια τράπεζας", BANK_COMMISSION);
+    add(ExpenseType.LICENSE, "Τέλος άδειας", licenseFee(isMotorcycle));
+    add(ExpenseType.BANK, "Προμήθεια τράπεζας", BANK_COMMISSION);
   }
 
   // Τέλος μεταβίβασης (βάσει κυβικών) — στους τύπους με το flag.
   if (c.caseType.hasTransferFee && c.vehicle?.cc) {
-    add("Τέλος μεταβίβασης", transferFee(c.vehicle.cc));
+    add(ExpenseType.TRANSFER, "Τέλος μεταβίβασης", transferFee(c.vehicle.cc));
   }
 
   // Τέλη κυκλοφορίας (ρύποι ή κυβικά) — στους τύπους με το flag.
@@ -154,7 +155,7 @@ export async function addSuggestedExpenses(fd: FormData) {
       c.vehicle?.emissions ?? null,
       c.vehicle?.cc ?? null,
     );
-    if (circ) add("Τέλη κυκλοφορίας", circ.amount);
+    if (circ) add(ExpenseType.CIRCULATION, "Τέλη κυκλοφορίας", circ.amount);
   }
 
   if (toCreate.length > 0) {
