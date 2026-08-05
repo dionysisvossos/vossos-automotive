@@ -191,18 +191,31 @@ export default async function CasesPage({
         <h1 style={{ margin: 0, fontSize: 22 }}>Υποθέσεις</h1>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <a
-            href={`/api/cases/export/registrations${exportQs ? `?${exportQs}` : ""}`}
+            href={`/print/registrations${exportQs ? `?${exportQs}` : ""}`}
+            target="_blank"
+            rel="noopener"
             className="btn btn-ghost"
-            title="Λίστα ταξινομήσεων (επείγοντα πρώτα, αριθμημένα)"
+            title="Εκτυπώσιμη λίστα ταξινομήσεων (επείγοντα πρώτα, αριθμημένα)"
           >
-            ⬇ Ταξινομήσεις
+            🖨 Ταξινομήσεις
           </a>
           <a
-            href={`/api/cases/export/transfers${exportQs ? `?${exportQs}` : ""}`}
+            href={`/print/transfers${exportQs ? `?${exportQs}` : ""}`}
+            target="_blank"
+            rel="noopener"
             className="btn btn-ghost"
-            title="Λίστα μεταβιβάσεων (επείγοντα πρώτα, αριθμημένα)"
+            title="Εκτυπώσιμη λίστα μεταβιβάσεων"
           >
-            ⬇ Μεταβιβάσεις
+            🖨 Μεταβιβάσεις
+          </a>
+          <a
+            href={`/print/other${exportQs ? `?${exportQs}` : ""}`}
+            target="_blank"
+            rel="noopener"
+            className="btn btn-ghost"
+            title="Εκτυπώσιμη λίστα λοιπών εργασιών (πλην ταξινομήσεων/μεταβιβάσεων/ΦΙΧ)"
+          >
+            🖨 Λοιπές
           </a>
           <a
             href={`/api/cases/export${exportQs ? `?${exportQs}` : ""}`}
