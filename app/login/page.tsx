@@ -41,9 +41,14 @@ export default async function LoginPage({
         className="card"
         style={{ width: 340, padding: 28, display: "grid", gap: 14 }}
       >
-        <div>
-          <h1 style={{ margin: 0, fontSize: 20 }}>Vossos Automotive</h1>
-          <p style={{ margin: "4px 0 0", color: "var(--text-muted)" }}>
+        <div style={{ textAlign: "center" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.png"
+            alt="Vossos Automotive Solutions"
+            style={{ height: 110, width: "auto", display: "block", margin: "0 auto 8px" }}
+          />
+          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 14 }}>
             Σύνδεση στη διαχείριση υποθέσεων
           </p>
         </div>

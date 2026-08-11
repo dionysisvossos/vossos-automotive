@@ -18,15 +18,21 @@ export default async function AppLayout({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          height: 56,
+          height: 64,
         }}
       >
         <nav style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <Link
             href="/cases"
-            style={{ fontWeight: 500, color: "var(--text)" }}
+            style={{ display: "flex", alignItems: "center" }}
+            aria-label="Vossos Automotive Solutions — Αρχική"
           >
-            Vossos Automotive
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="Vossos Automotive Solutions"
+              style={{ height: 46, width: "auto", display: "block" }}
+            />
           </Link>
           <Link href="/cases">Υποθέσεις</Link>
           {session?.user?.role === "ADMIN" && (

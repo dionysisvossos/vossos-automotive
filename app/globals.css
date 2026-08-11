@@ -2,11 +2,12 @@
   --bg: #f6f7f9;
   --surface: #ffffff;
   --border: #e3e6ea;
-  --text: #1a1d21;
+  --text: #22262b; /* ανθρακί λογότυπου */
   --text-muted: #6b7280;
-  --primary: #1f5fa8;
+  --primary: #930000; /* κόκκινο λογότυπου */
   --primary-text: #ffffff;
-  --danger: #b3261e;
+  --charcoal: #34373b; /* σκούρο γκρι λογότυπου (road/υπότιτλος) */
+  --danger: #c0392b;
   --success: #1d7a4d;
   --warning: #9a6b00;
   --radius: 8px;
