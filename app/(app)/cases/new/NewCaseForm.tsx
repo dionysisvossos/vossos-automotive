@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createCase, type CreateCaseInput } from "../actions";
 import { aitisiTemplateFor } from "@/lib/aitisi-template";
+import { brandsFor } from "@/lib/vehicle-brands";
 import PartyRow, { type PartyValue } from "./PartyRow";
 
 type CaseTypeOption = {
@@ -544,7 +545,18 @@ export default function NewCaseForm({
             </label>
             <label style={labelStyle}>
               Μάρκα
-              <input value={make} onChange={(e) => setMake(e.target.value)} />
+              <input
+                value={make}
+                onChange={(e) => setMake(e.target.value)}
+                list="vehicle-brands"
+                autoComplete="off"
+                placeholder="Επιλογή ή πληκτρολόγηση…"
+              />
+              <datalist id="vehicle-brands">
+                {brandsFor(vehCategory).map((b) => (
+                  <option key={b} value={b} />
+                ))}
+              </datalist>
             </label>
             <label style={labelStyle}>
               Ρύποι (CO₂ g/km)
