@@ -14,12 +14,15 @@ RUN npm ci
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Placeholders μόνο για το build (τα πραγματικά έρχονται από το compose στο
-# runtime). Αποτρέπουν αποτυχία build αν κάποιο module διαβάσει env.
-ENV DATABASE_URL="postgresql://build:build@localhost:5432/build?schema=public"
-ENV AUTH_SECRET="build-time-placeholder"
-# Παράγει τον Prisma client (driver adapter) και χτίζει το Next.js.
-RUN npx prisma generate && npm run build
+# Παράγει τον Prisma client (driver adapter) και χτίζει το Next.js. Τα
+# placeholder DATABASE_URL/AUTH_SECRET δίνονται μέσω `export` μέσα στο RUN
+# (όχι ως ENV instruction, ώστε να μη θεωρηθούν «μυστικά» στο image) — τα
+# πραγματικά έρχονται από το compose στο runtime. Το prisma.config.ts απαιτεί
+# resolvable DATABASE_URL ακόμη και για το generate.
+RUN export DATABASE_URL="postgresql://build:build@localhost:5432/build?schema=public" \
+    && export AUTH_SECRET="build-time-placeholder" \
+    && npx prisma generate \
+    && npm run build
 
 # ── Runner ───────────────────────────────────────────────────
 FROM base AS runner
