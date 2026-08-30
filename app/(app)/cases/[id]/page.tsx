@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { CaseStageState, CaseState } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { aitisiTemplateFor } from "@/lib/aitisi";
+import PartyContactEditor from "./PartyContactEditor";
 import {
   licenseFee,
   transferFee,
@@ -335,40 +336,14 @@ export default async function CaseDetailPage({
             <p style={{ color: "var(--text-muted)", margin: 0 }}>—</p>
           )}
           <div style={{ display: "grid", gap: 12 }}>
-            {c.parties.map((p) => {
-              const ct = p.contact;
-              const details: [string, string | null][] = [
-                ["ΑΦΜ", ct.afm],
-                ["Ταυτότητα", ct.idNumber],
-                ["Τηλ", ct.phone],
-                ["Email", ct.email],
-                ["Διεύθυνση", ct.address],
-              ];
-              return (
-                <div key={p.id} style={{ display: "grid", gap: 4 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span style={{ fontWeight: 500 }}>
-                      {ct.firstName ? `${ct.lastName} ${ct.firstName}` : ct.lastName}
-                    </span>
-                    <span className="badge">{ROLE_LABELS[p.role] ?? p.role}</span>
-                  </div>
-                  {details.some(([, v]) => v) && (
-                    <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                      {details
-                        .filter(([, v]) => v)
-                        .map(([label, v]) => `${label}: ${v}`)
-                        .join(" · ")}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {c.parties.map((p) => (
+              <PartyContactEditor
+                key={p.id}
+                caseId={c.id}
+                roleLabel={ROLE_LABELS[p.role] ?? p.role}
+                contact={p.contact}
+              />
+            ))}
           </div>
         </div>
 

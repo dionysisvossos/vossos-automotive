@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { requireOperator } from "@/lib/auth-guard";
 
 const partySchema = z.object({
   role: z.nativeEnum(CasePartyRole),
@@ -262,4 +263,46 @@ export async function searchContacts(query: string): Promise<ContactMatch[]> {
     ORDER BY "lastName" ASC, "firstName" ASC
     LIMIT 8
   `;
+}
+
+// Επεξεργασία στοιχείων υπάρχουσας επαφής (π.χ. συμπλήρωση πατρώνυμου σε
+// παλιό πελάτη). Καλείται inline από την καρτέλα υπόθεσης.
+const updateContactSchema = z.object({
+  contactId: z.string().min(1),
+  caseId: z.string().min(1), // για revalidation της καρτέλας
+  contactType: z.nativeEnum(ContactType),
+  lastName: z.string().trim().min(1, "Το επώνυμο είναι υποχρεωτικό"),
+  firstName: z.string().trim().optional(),
+  fatherName: z.string().trim().optional(),
+  afm: z.string().trim().optional(),
+  doy: z.string().trim().optional(),
+  idNumber: z.string().trim().optional(),
+  phone: z.string().trim().optional(),
+  email: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+});
+
+export type UpdateContactInput = z.infer<typeof updateContactSchema>;
+
+export async function updateContact(input: UpdateContactInput): Promise<void> {
+  await requireOperator(); // ADMIN/EMPLOYEE — ο VIEWER δεν επεξεργάζεται
+  const d = updateContactSchema.parse(input);
+
+  await prisma.contact.update({
+    where: { id: d.contactId },
+    data: {
+      type: d.contactType,
+      lastName: d.lastName,
+      firstName: d.firstName || null,
+      fatherName: d.fatherName || null,
+      afm: d.afm || null,
+      doy: d.doy || null,
+      idNumber: d.idNumber || null,
+      phone: d.phone || null,
+      email: d.email || null,
+      address: d.address || null,
+    },
+  });
+
+  revalidatePath(`/cases/${d.caseId}`);
 }
