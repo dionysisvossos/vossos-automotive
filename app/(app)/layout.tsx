@@ -10,18 +10,8 @@ export default async function AppLayout({
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      <header
-        style={{
-          background: "var(--surface)",
-          borderBottom: "1px solid var(--border)",
-          padding: "0 20px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          height: 64,
-        }}
-      >
-        <nav style={{ display: "flex", alignItems: "center", gap: 20 }}>
+      <header className="app-header">
+        <nav className="app-nav">
           <Link
             href="/cases"
             style={{ display: "flex", alignItems: "center" }}
@@ -40,7 +30,7 @@ export default async function AppLayout({
           )}
         </nav>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div className="header-right">
           {session?.user && (
             <Link
               href="/profile"
@@ -62,9 +52,7 @@ export default async function AppLayout({
         </div>
       </header>
 
-      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px" }}>
-        {children}
-      </main>
+      <main className="app-main">{children}</main>
     </div>
   );
 }

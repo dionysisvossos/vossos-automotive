@@ -103,3 +103,56 @@ select {
   font-size: 12px;
   border: 1px solid var(--border);
 }
+
+/* ── Layout (responsive) ───────────────────────────────── */
+.app-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  min-height: 64px;
+  flex-wrap: wrap;
+}
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.app-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+  .app-header {
+    padding: 8px 12px;
+    gap: 8px 14px;
+  }
+  .app-nav {
+    gap: 14px;
+  }
+  .app-main {
+    padding: 16px 12px;
+  }
+  /* Επιτρέπει σε πεδία μέσα σε grid/flex κελιά να συρρικνωθούν (αλλιώς το
+     intrinsic min-width των inputs διευρύνει το layout πέρα από την οθόνη). */
+  .card input,
+  .card select,
+  .card textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+}

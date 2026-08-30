@@ -183,9 +183,20 @@ export default async function CaseDetailPage({
             alignItems: "center",
             justifyContent: "space-between",
             marginTop: 8,
+            flexWrap: "wrap",
+            gap: 10,
           }}
         >
-          <h1 style={{ margin: 0, fontSize: 22, display: "flex", alignItems: "center", gap: 10 }}>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 22,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
             <span>
               {c.code}{" "}
               <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
@@ -311,7 +322,13 @@ export default async function CaseDetailPage({
         />
       </section>
 
-      <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <section
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+          gap: 16,
+        }}
+      >
         <div className="card" style={{ padding: 18 }}>
           <h2 style={{ margin: "0 0 12px", fontSize: 16 }}>Εμπλεκόμενοι</h2>
           {c.parties.length === 0 && (
@@ -714,6 +731,7 @@ export default async function CaseDetailPage({
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
+                  flexWrap: "wrap",
                   padding: "8px 10px",
                   borderBottom: "1px solid var(--border)",
                   background: isCurrent ? "#eef3fb" : undefined,

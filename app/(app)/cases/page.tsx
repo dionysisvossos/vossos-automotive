@@ -186,10 +186,14 @@ export default async function CasesPage({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 12,
         }}
       >
         <h1 style={{ margin: 0, fontSize: 22 }}>Υποθέσεις</h1>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div
+          style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}
+        >
           <a
             href={`/print/registrations${exportQs ? `?${exportQs}` : ""}`}
             target="_blank"
@@ -438,8 +442,8 @@ export default async function CasesPage({
         )}
       </form>
 
-      <div className="card" style={{ overflow: "hidden" }}>
-        <table>
+      <div className="card" style={{ overflowX: "auto" }}>
+        <table style={{ minWidth: 640 }}>
           <thead>
             <tr>
               <th>Κωδικός</th>
