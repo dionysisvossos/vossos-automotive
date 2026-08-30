@@ -56,6 +56,38 @@ npm run dev            # http://localhost:3000
 Αρχικός λογαριασμός από το seed: `admin@vossos.local` / `admin1234`
 (ρυθμίζεται με `ADMIN_EMAIL` / `ADMIN_PASSWORD` — **άλλαξέ τον**).
 
+## Ανάπτυξη με Docker (deploy)
+
+Πλήρης στοίβα (εφαρμογή + PostgreSQL) με **Docker** & **Docker Compose** —
+τρέχει σε οποιονδήποτε server, όχι μόνο τοπικά.
+
+```bash
+cp .env.example .env          # συμπλήρωσε POSTGRES_PASSWORD & AUTH_SECRET
+#   AUTH_SECRET:  openssl rand -base64 32
+docker compose up -d --build
+```
+
+Στην **πρώτη** εκκίνηση εφαρμόζονται αυτόματα τα migrations (extensions,
+`f_unaccent` index, schema) και γίνεται seed (τύποι υποθέσεων + αρχικός
+admin). Η εφαρμογή είναι διαθέσιμη στο `http://<server>:${APP_PORT:-3000}`.
+**Άλλαξε τον κωδικό του admin** μετά την πρώτη σύνδεση.
+
+- Τα δεδομένα της βάσης παραμένουν στο named volume `db_data` (επιβιώνουν
+  restart/rebuild). Το seed **δεν** ξανατρέχει όσο υπάρχουν δεδομένα, οπότε
+  δεν χάνονται παραμετροποιήσεις.
+- Οι **αιτήσεις PDF** χρησιμοποιούν τη γραμματοσειρά DejaVu Sans (εγκαθίσταται
+  στο image) για ελληνικά.
+- Πίσω από reverse proxy/domain όρισε `AUTH_URL=https://<domain>` στο `.env`.
+- Για **εξωτερική** βάση (managed Postgres): άλλαξε το `DATABASE_URL` στην
+  υπηρεσία `app` και αφαίρεσε την υπηρεσία `db`.
+
+| Εντολή | Τι κάνει |
+|---|---|
+| `docker compose up -d --build` | Build & εκκίνηση στο παρασκήνιο |
+| `docker compose logs -f app` | Παρακολούθηση logs εφαρμογής |
+| `docker compose down` | Σταμάτημα (κρατά τα δεδομένα) |
+| `docker compose down -v` | Σταμάτημα + **διαγραφή** δεδομένων |
+
 ## Χρήσιμες εντολές
 
 | Εντολή | Τι κάνει |

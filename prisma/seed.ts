@@ -326,6 +326,19 @@ const caseTypes: SeedType[] = [
 ];
 
 async function main() {
+  // Στο Docker (πρώτη εκκίνηση) θέτουμε SEED_SKIP_IF_EXISTS=1 ώστε το seed
+  // να τρέχει ΜΟΝΟ σε άδεια βάση — αλλιώς κάθε restart θα ξανάγραφε τα
+  // στάδια/δικαιολογητικά, σβήνοντας τυχόν παραμετροποιήσεις του admin.
+  if (process.env.SEED_SKIP_IF_EXISTS === "1") {
+    const existing = await prisma.caseType.count();
+    if (existing > 0) {
+      console.log(
+        `✓ Υπάρχουν ήδη ${existing} τύποι υποθέσεων — παράλειψη seed.`,
+      );
+      return;
+    }
+  }
+
   for (const t of caseTypes) {
     const caseType = await prisma.caseType.upsert({
       where: { name: t.name },

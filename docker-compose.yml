@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vossos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Όρισε POSTGRES_PASSWORD στο .env}
+      POSTGRES_DB: ${POSTGRES_DB:-vossos}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vossos} -d ${POSTGRES_DB:-vossos}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vossos}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-vossos}?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:?Όρισε AUTH_SECRET στο .env (openssl rand -base64 32)}
+      # Απαραίτητο πίσω από proxy / εκτός localhost για το Auth.js v5.
+      AUTH_TRUST_HOST: "true"
+      # Χρησιμοποιούνται ΜΟΝΟ στην πρώτη εκκίνηση (seed σε άδεια βάση) για τη
+      # δημιουργία του αρχικού admin. Άλλαξε τον κωδικό μετά το πρώτο login.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@vossos.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin1234}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+volumes:
+  db_data:
